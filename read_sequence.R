@@ -1,4 +1,4 @@
-setwd("/Users/teresabortolotti/Documents/R/Interferometria")
+setwd("/Users/teresabortolotti/Documents/R/Interferometry")
 
 rm(list=ls())
 graphics.off()
