@@ -33,6 +33,11 @@ for(t in 1:392)
 
 save(my_seq_arr, file="DATA/filtered_sequence_array.RData")
 
+# load("DATA/filtered_sequence_array.RData")
+# lambda <- 5.54658
+# seq_temp <- - my_seq_arr*lambda/(4*pi)
+# save(seq_temp, file="DATA/final_temporal_sequence_array.RData")
+
 
 ## UTILITIES: read CSV sequentially -----------------------------------------------
 # Create an array and save the time sequence in the selected small window
