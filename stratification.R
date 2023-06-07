@@ -13,7 +13,7 @@ cat("\014")
 #' Estimation of the stratification effect
 #' 
 
-## LOAD DATA
+## LOAD DATA ---------------------------------------------------------------------
 # Sequence of displacement
 load("DATA/final_temporal_sequence_array.RData")
 
