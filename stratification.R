@@ -19,6 +19,11 @@ load("DATA/final_temporal_sequence_array.RData")
 
 # Temporal information
 load("DATA/tva_date.RData")
+c(tva_date[1],tva_date[392])
+# Time window goes from 2015-03-27 to 2023-02-22
+# Let us consider one year:
+year <- tva_date[1:27]
+c(year[1], year[27])
 
 # DTM
 load("DATA/dtm.RData")
@@ -54,8 +59,8 @@ ggplot(data=vel.df,aes(x=x,y=y,fill=z)) +
        title= "Mean velocity in coherent pixels",
        x="", y="")
 
-## Consider only the pixels with velocity in (-0.3,0.3)
-idxs_low <- which(velocity>=-0.05 & velocity <=0.05)
+## Consider only the pixels with velocity in (-0.5,0.5)
+idxs_low <- which(velocity>=-0.5 & velocity <=0.5)
 {
   low_vel <- array(NA, dim=c(601,601))
   low_vel[idxs_low] = velocity[idxs_low]
@@ -75,32 +80,55 @@ idxs_low <- which(velocity>=-0.05 & velocity <=0.05)
          x="", y="")
 }
 
+# Work with the image of the second day
+j <- 2
+day2 <- tva_date[2][[1]]
 
+daily_image <- seq_temp[,,j]
+low_dtm <- array(NA, dim=c(601,601))
+low_dtm[idxs_low] <- dtm[idxs_low]
+low_dimage <- array(NA, dim=c(601,601))
+low_dimage[idxs_low] <- daily_image[idxs_low]
 
+low_dtm_vec <- as.vector(low_dtm)
+low_seq_vec <- as.vector(low_dimage)
 
-c(tva_date[1],tva_date[392])
-# Time window goes from 2015-03-27 to 2023-02-22
-# Let us consider one year:
-year <- tva_date[1:27]
-c(year[1], year[27])
+# For plots that follow
+range(low_dtm_vec[!is.na(low_dtm_vec)])
+x.min <- 40
+x.max <- 460
+
+range(low_seq_vec[!is.na(low_seq_vec)])
+y.min <- -2.5
+y.max <- 2.5
 
 #' First plot
-#' Transform matrix into vectors
-#' 
-
-j <- 2
-
-dtm_vec <- as.vector(dtm[idxs_low])
-seq_vec <- as.vector(seq_temp[,,j])
-seq_vec_low <- seq_vec[idxs_low]
-
 
 x11()
-plot(dtm_vec, seq_vec_low, pch=16, main=paste0("Date: ", tva_date[j]))
+plot(low_dtm_vec, low_seq_vec, pch=16, main=paste0("Date: ", tva_date[j]))
 
-for(date in year)
-{
-  plot()
+## Moving window -----------------------------------------------------------------
+window_width <- 100
+
+for(i in 1:6){
+  for(j in 1:6){
+    
+    rectangle.x <- ((i-1)*window_width+1):(window_width*i)
+    rectangle.y <- ((j-1)*window_width+1):(window_width*j)
+    
+    seq_ij <- low_dimage[rectangle.x, rectangle.y]
+    dtm_ij <- low_dtm[rectangle.x, rectangle.y]
+    
+    seqij_vec <- as.vector(seq_ij)
+    dtmij_vec <- as.vector(dtm_ij)
+    
+    pdf(file = paste0(save.dir,"/displ_vs_dtm_i",i,"_j",j,".pdf"), width = 8, height = 6)
+    par(mar = c(5, 4, 4, 6))
+    plot(dtmij_vec, seqij_vec, pch=16, main=paste0(day2, " in window: i=",i, " j=",j ),
+         xlim=c(x.min, x.max), ylim=c(y.min,y.max))
+    dev.off()
+    
+  }
 }
 
 ## Linear regression -------------------------------------------------------------

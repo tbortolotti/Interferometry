@@ -449,4 +449,172 @@ levelplot(image_t, col.regions=viridis(60), at=seq(d.min, d.max, length.out=60),
 dev.off()
 
 
+## PLOT OF THE MOVING WINDOW SYSTEM -------------------------------------------------
+setwd("/Users/teresabortolotti/Documents/R/Interferometry")
+
+
+library(RColorBrewer)
+library(ggplot2)
+library(lattice)
+library(lubridate)
+library(viridis)
+
+rm(list=ls())
+graphics.off()
+cat("\014")
+
+# save.dir <- "/Users/teresabortolotti/Desktop/StatInf-project/images"
+save.dir <- paste0(getwd(), "/images/mov_window")
+dir.create(save.dir)
+
+#### Load data ----------------------------------------------------------------------
+# Temporal information
+load("DATA/tva_date.RData")
+j <- 2
+day2 <- tva_date[2][[1]]  # consider just one day
+
+# Sequence of displacement
+load("DATA/final_temporal_sequence_array.RData")
+daily_image <- seq_temp[,,j]
+
+# DTM
+load("DATA/dtm.RData")
+
+# Velocity
+load("DATA/velocity_filtered.RData")
+
+#### Plot ----------------------------------------------------------------------------
+
+# Velocity in the entire image
+range(velocity[!is.na(velocity)])
+vel.min <- -3
+vel.max <- 3
+
+vel_corr <- velocity
+vel_corr[which(velocity > vel.max)] <- vel.max
+vel_corr[which(velocity < vel.min)] <- vel.min
+
+xx <- rep(1:dim(vel_corr)[1], dim(vel_corr)[2])
+yy <- rep(1:dim(vel_corr)[2], each=dim(vel_corr)[1])
+vel.df <- data.frame(x=xx,y=yy,z=as.vector(vel_corr))
+
+x11()
+ggplot(data=vel.df,aes(x=x,y=y,fill=z)) +
+  scale_fill_continuous(type="viridis",na.value="white",
+                        limits=c(vel.min,vel.max)) +
+  geom_tile() + 
+  labs(fill= "Mean velocity",
+       title= "Mean velocity in coherent pixels",
+       x="", y="")
+
+## Consider only the pixels with velocity in (-0.5,0.5)
+idxs_low <- which(velocity>=-0.5 & velocity <=0.5)
+{
+  low_vel <- array(NA, dim=c(601,601))
+  low_vel[idxs_low] = velocity[idxs_low]
+  
+  xx <- rep(1:dim(low_vel)[1], dim(low_vel)[2])
+  yy <- rep(1:dim(low_vel)[2], each=dim(low_vel)[1])
+  low_vel.df <- data.frame(x=xx,y=yy,z=as.vector(low_vel))
+  
+  x11()
+  ggplot(data=low_vel.df,aes(x=x,y=y,fill=z)) +
+    scale_fill_continuous(type="viridis",
+                          na.value="white",
+                          limits=c(vel.min,vel.max)) +
+    geom_tile() + 
+    labs(fill= "Mean velocity",
+         title= "Mean velocity in coherent and slowly moving pixels",
+         x="", y="")
+}
+
+low_dtm <- array(NA, dim=c(601,601))
+low_dtm[idxs_low] <- dtm[idxs_low]
+low_dimage <- array(NA, dim=c(601,601))
+low_dimage[idxs_low] <- daily_image[idxs_low]
+
+## Displacement in the entire image
+d.min <- quantile(seq_temp[!is.na(seq_temp)], probs=0.1)
+d.min <- as.numeric(d.min)
+d.max <- quantile(seq_temp[!is.na(seq_temp)], probs=0.9)
+d.max <- as.numeric(d.max)
+image_t <- low_dimage
+image_t[which(image_t>d.max)] <- d.max
+image_t[which(image_t<d.min)] <- d.min
+
+xx <- rep(1:dim(image_t)[1], dim(image_t)[2])
+yy <- rep(1:dim(image_t)[2], each=dim(image_t)[1])
+image_t.df <- data.frame(x=xx,y=yy,z=as.vector(image_t))
+
+# plot with geom_tiles
+ggplot(data=image_t.df,aes(x=x,y=y,fill=z)) +
+  scale_fill_continuous(type="viridis",
+                        na.value="white") +
+  geom_tile() + 
+  labs(fill= "Displacement",
+       title= paste0("Displacement in the window of interest at ", day2),
+       x="", y="")
+
+dev.off()
+
+
+# #pdf(file = paste0(save.dir,"/sequence/WOI_seq_",t,".pdf"), width = 8, height = 6)
+# x11()
+# par(mar = c(5, 4, 4, 6))
+# levelplot(image_t, col.regions=viridis(60), at=seq(d.min, d.max, length.out=60),
+#           main=paste0("Displacement in the window of interest at ", day2))
+# dev.off()
+
+## Moving window
+window_width <- 100
+
+gplot <- ggplot(data=image_t.df,aes(x=x,y=y,fill=z)) +
+         scale_fill_continuous(type="viridis",
+                        na.value="white") +
+         geom_tile() + 
+         labs(fill= "Displacement",
+              title= paste0("Displacement in the window of interest at ", day2),
+              x="", y="")
+
+plot_list <- list()
+counter <- 0
+for(i in 1:6){
+  for(j in 1:6){
+    
+    counter <- counter+1
+    rectangle.x <- ((i-1)*window_width+1):(window_width*i)
+    rectangle.y <- ((j-1)*window_width+1):(window_width*j)
+    
+    # add rectangle to the plot
+    gplot.annotated <- gplot +
+      annotate("rect", xmin = rectangle.x[1], xmax = rectangle.x[window_width],
+               ymin = rectangle.y[1], ymax = rectangle.y[window_width],
+               colour="red", lwd=2,
+               fill=NA)
+    
+    plot_list[[counter]] <- gplot.annotated
+
+  }
+}
+
+counter <- 0
+for(i in 1:2){
+  for(j in 1:6){
+    counter <- counter+1
+    ggsave(filename = paste0(day2,"_i",i,"_j",j,".png"),
+           plot = plot_list[[counter]],
+           device = NULL,
+           path = save.dir,
+           scale = 1,
+           width = 7,
+           height = 6,
+           units = "in",
+           dpi = 320,
+           limitsize = TRUE,
+           bg = NULL,)
+  }
+}
+
+##
+
 
