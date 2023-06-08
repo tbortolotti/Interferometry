@@ -80,6 +80,7 @@ idxs_low <- which(velocity>=-0.5 & velocity <=0.5)
          x="", y="")
 }
 
+
 # Work with the image of the second day
 j <- 2
 day2 <- tva_date[2][[1]]
@@ -103,11 +104,16 @@ y.min <- -2.5
 y.max <- 2.5
 
 #' First plot
+pdf(file = paste0(save.dir,"/displ_vs_dtm_WOI.pdf"), width = 8, height = 6)
+par(mar = c(5, 4, 4, 6))
+plot(low_dtm_vec, low_seq_vec, pch=16, main=paste0("Date: ", tva_date[j]),
+     xlim=c(x.min, x.max), ylim=c(y.min,y.max))
+dev.off()
 
-x11()
-plot(low_dtm_vec, low_seq_vec, pch=16, main=paste0("Date: ", tva_date[j]))
+## MOVING WINDOW -----------------------------------------------------------------
+save.dir <- paste0(getwd(), "/images/stratification/mov_window")
+dir.create(save.dir)
 
-## Moving window -----------------------------------------------------------------
 window_width <- 100
 
 for(i in 1:6){
@@ -130,6 +136,40 @@ for(i in 1:6){
     
   }
 }
+
+#' using a moving window doesn't really seem to be a good idea, since apparently we are
+#' not directly able to guarantee enough variability along the dtm axis.
+#' 
+#' ALTERNATIVE? Apply a random mask over the entire image, estimate the monotonic
+#' behaviour of the signal with respect to dtm and eventually average the results.
+
+## RANDOM MASK -------------------------------------------------------------------
+save.dir <- paste0(getwd(), "/images/stratification/random_mask")
+dir.create(save.dir)
+
+n_rep <- 5
+size <- 2000
+not_na_idxs <- which(!is.na(low_dimage))
+
+set.seed(140996)
+for(i in 1:n_rep){
+  random_mask <- array(NA, dim=c(601,601))
+  idxs_mask <- sample(not_na_idxs, size=size)
+  random_mask[idxs_mask] <- 1
+  
+  seq_ij <- low_dimage*random_mask
+  dtm_ij <- low_dtm*random_mask
+  
+  seqij_vec <- as.vector(seq_ij)
+  dtmij_vec <- as.vector(dtm_ij)
+  
+  pdf(file = paste0(save.dir,"/rmask_",i,".pdf"), width = 8, height = 6)
+  par(mar = c(5, 4, 4, 6))
+  plot(dtmij_vec, seqij_vec, pch=16, main=paste0(day2, " with random mask: ",i),
+       xlim=c(x.min, x.max), ylim=c(y.min,y.max))
+  dev.off()
+}
+
 
 ## Linear regression -------------------------------------------------------------
 

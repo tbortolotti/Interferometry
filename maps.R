@@ -464,7 +464,7 @@ graphics.off()
 cat("\014")
 
 # save.dir <- "/Users/teresabortolotti/Desktop/StatInf-project/images"
-save.dir <- paste0(getwd(), "/images/mov_window")
+save.dir <- paste0(getwd(), "/images/stratification/mov_window")
 dir.create(save.dir)
 
 #### Load data ----------------------------------------------------------------------
@@ -598,7 +598,7 @@ for(i in 1:6){
 }
 
 counter <- 0
-for(i in 1:2){
+for(i in 1:6){
   for(j in 1:6){
     counter <- counter+1
     ggsave(filename = paste0(day2,"_i",i,"_j",j,".png"),
@@ -615,6 +615,175 @@ for(i in 1:2){
   }
 }
 
-##
+## PLOT THE RANDOM MASK SYSTEM -----------------------------------------------------
+#### Load data ----------------------------------------------------------------------
+# Temporal information
+load("DATA/tva_date.RData")
+j <- 2
+day2 <- tva_date[2][[1]]  # consider just one day
 
+# Sequence of displacement
+load("DATA/final_temporal_sequence_array.RData")
+daily_image <- seq_temp[,,j]
 
+# DTM
+load("DATA/dtm.RData")
+
+# Velocity
+load("DATA/velocity_filtered.RData")
+
+#### Plot ----------------------------------------------------------------------------
+
+# Velocity in the entire image
+range(velocity[!is.na(velocity)])
+vel.min <- -3
+vel.max <- 3
+
+vel_corr <- velocity
+vel_corr[which(velocity > vel.max)] <- vel.max
+vel_corr[which(velocity < vel.min)] <- vel.min
+
+xx <- rep(1:dim(vel_corr)[1], dim(vel_corr)[2])
+yy <- rep(1:dim(vel_corr)[2], each=dim(vel_corr)[1])
+vel.df <- data.frame(x=xx,y=yy,z=as.vector(vel_corr))
+
+x11()
+ggplot(data=vel.df,aes(x=x,y=y,fill=z)) +
+  scale_fill_continuous(type="viridis",na.value="white",
+                        limits=c(vel.min,vel.max)) +
+  geom_tile() + 
+  labs(fill= "Mean velocity",
+       title= "Mean velocity in coherent pixels",
+       x="", y="")
+
+## Consider only the pixels with velocity in (-0.5,0.5)
+idxs_low <- which(velocity>=-0.5 & velocity <=0.5)
+{
+  low_vel <- array(NA, dim=c(601,601))
+  low_vel[idxs_low] = velocity[idxs_low]
+  
+  xx <- rep(1:dim(low_vel)[1], dim(low_vel)[2])
+  yy <- rep(1:dim(low_vel)[2], each=dim(low_vel)[1])
+  low_vel.df <- data.frame(x=xx,y=yy,z=as.vector(low_vel))
+  
+  x11()
+  ggplot(data=low_vel.df,aes(x=x,y=y,fill=z)) +
+    scale_fill_continuous(type="viridis",
+                          na.value="white",
+                          limits=c(vel.min,vel.max)) +
+    geom_tile() + 
+    labs(fill= "Mean velocity",
+         title= "Mean velocity in coherent and slowly moving pixels",
+         x="", y="")
+}
+
+low_dtm <- array(NA, dim=c(601,601))
+low_dtm[idxs_low] <- dtm[idxs_low]
+low_dimage <- array(NA, dim=c(601,601))
+low_dimage[idxs_low] <- daily_image[idxs_low]
+
+## Displacement in the entire image
+d.min <- quantile(seq_temp[!is.na(seq_temp)], probs=0.1)
+d.min <- as.numeric(d.min)
+d.max <- quantile(seq_temp[!is.na(seq_temp)], probs=0.9)
+d.max <- as.numeric(d.max)
+image_t <- low_dimage
+image_t[which(image_t>d.max)] <- d.max
+image_t[which(image_t<d.min)] <- d.min
+
+xx <- rep(1:dim(image_t)[1], dim(image_t)[2])
+yy <- rep(1:dim(image_t)[2], each=dim(image_t)[1])
+image_t.df <- data.frame(x=xx,y=yy,z=as.vector(image_t))
+
+# plot with geom_tiles
+ggplot(data=image_t.df,aes(x=x,y=y,fill=z)) +
+  scale_fill_continuous(type="viridis",
+                        na.value="white") +
+  geom_tile() + 
+  labs(fill= "Displacement",
+       title= paste0("Displacement in the window of interest at ", day2),
+       x="", y="")
+
+dev.off()
+
+## Random mask
+save.dir <- paste0(getwd(), "/images/stratification/random_mask")
+dir.create(save.dir)
+
+n_rep <- 5
+size <- 2000
+not_na_idxs <- which(!is.na(low_dimage))
+
+plot_list_seq <- list()
+plot_list_dtm <- list()
+set.seed(140996)
+for(i in 1:n_rep){
+  random_mask <- array(NA, dim=c(601,601))
+  idxs_mask <- sample(not_na_idxs, size=size)
+  random_mask[idxs_mask] <- 1
+  
+  image_t <- low_dimage*random_mask
+  image_t[which(image_t>d.max)] <- d.max
+  image_t[which(image_t<d.min)] <- d.min
+  
+  xx <- rep(1:dim(image_t)[1], dim(image_t)[2])
+  yy <- rep(1:dim(image_t)[2], each=dim(image_t)[1])
+  image_t.df <- data.frame(x=xx,y=yy,z=as.vector(image_t))
+  
+  gplot_seq <- ggplot(data=image_t.df,aes(x=x,y=y,fill=z)) +
+    scale_fill_continuous(type="viridis",
+                          na.value="white") +
+    geom_tile() + 
+    labs(fill= "Displacement",
+         title= paste0("Displacement for random mask ",i, " at ", day2),
+         x="", y="")
+  
+  plot_list_seq[[i]] <- gplot_seq
+  
+  image_t <- low_dtm*random_mask
+  image_t[which(image_t>d.max)] <- d.max
+  image_t[which(image_t<d.min)] <- d.min
+  
+  xx <- rep(1:dim(image_t)[1], dim(image_t)[2])
+  yy <- rep(1:dim(image_t)[2], each=dim(image_t)[1])
+  image_t.df <- data.frame(x=xx,y=yy,z=as.vector(image_t))
+  
+  gplot_dtm <- ggplot(data=image_t.df,aes(x=x,y=y,fill=z)) +
+    scale_fill_continuous(type="viridis",
+                          na.value="white") +
+    geom_tile() + 
+    labs(fill= "Elevation",
+         title= paste0("DTM for random mask ",i, " at ", day2),
+         x="", y="")
+  
+  plot_list_dtm[[i]] <- gplot_dtm
+
+}
+
+for(i in 1:n_rep){
+  ggsave(filename = paste0("seq_",day2,"_i",i,".png"),
+         plot = plot_list_seq[[i]],
+         device = NULL,
+         path = save.dir,
+         scale = 1,
+         width = 7,
+         height = 6,
+         units = "in",
+         dpi = 320,
+         limitsize = TRUE,
+         bg = NULL,)
+}
+
+for(i in 1:n_rep){
+  ggsave(filename = paste0("dtm_",day2,"_i",i,".png"),
+         plot = plot_list_dtm[[i]],
+         device = NULL,
+         path = save.dir,
+         scale = 1,
+         width = 7,
+         height = 6,
+         units = "in",
+         dpi = 320,
+         limitsize = TRUE,
+         bg = NULL,)
+}
